@@ -3,7 +3,7 @@ from multiprocessing.connection import Listener
 from log_colorizer import get_color_logger
 from pytest import fixture
 from pytest import mark
-
+import pickle
 import logging
 import signal
 import json
@@ -34,7 +34,8 @@ class Slave(Process):
         if use.with_main:
             self.argv = ['', self.file]
             self.file = os.path.join(
-                os.path.dirname(__file__), '..', 'wdb', '__main__.py')
+                os.path.dirname(__file__), '..',  'client',
+                'wdb', '__main__.py')
 
         self.host = host
         self.port = port
@@ -62,10 +63,17 @@ class AttrDict(dict):
 class Message(object):
     def __init__(self, message):
         log.info('Received %s' % message)
+        pickled = False
+        if message.startswith('Server|'):
+            message = message.replace('Server|', '')
+            pickled = True
         if '|' in message:
             pipe = message.index('|')
             self.command, self.data = message[:pipe], message[pipe + 1:]
-            self.data = json.loads(self.data, object_hook=AttrDict)
+            if pickled and self.data:
+                self.data = pickle.loads(self.data.encode('utf-8'), protocol=2)
+            else:
+                self.data = json.loads(self.data, object_hook=AttrDict)
         else:
             self.command, self.data = message, ''
 
@@ -101,6 +109,9 @@ class Socket(object):
         log.info('Connection get')
         uuid = connection.recv_bytes().decode('utf-8')
         self.connections[uuid] = connection
+        msg = self.receive(uuid)
+        assert msg.command == 'ServerBreaks'
+        self.send('[]', uuid=uuid)
         self.send('Start', uuid=uuid)
         return uuid
 
@@ -138,8 +149,6 @@ class Socket(object):
 
         selectmsg = self.receive()
         assert selectmsg.command == 'SelectCheck'
-        if breaks is not None:
-            assert selectmsg.data.breaks == breaks
 
         assert self.receive().command == 'Watched'
 
@@ -196,7 +205,10 @@ def socket(request):
         signal.alarm(5)
 
     def end_socket():
-        socket.close(request.node.rep_call.failed)
+        failed = False
+        if hasattr(request.node, 'rep_call'):
+            failed = request.node.rep_call.failed
+        socket.close(failed)
         signal.alarm(0)
 
     request.addfinalizer(end_socket)

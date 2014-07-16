@@ -26,7 +26,6 @@ def test_main_on_running_script(socket):
 
     msg = socket.receive()
     assert msg.command == 'SelectCheck'
-    assert msg.data.breaks == []
     assert msg.data.frame.function == '<module>'
 
     msg = socket.receive()
@@ -41,4 +40,3 @@ def test_main_on_running_script(socket):
 def test_main_on_unexisting_script(socket):
     # If it doesn't timeout this is good
     socket.join()
-

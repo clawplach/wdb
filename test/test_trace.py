@@ -5,6 +5,7 @@ from .conftest import use
 @use('trace_in_script.py')
 def test_with_trace(socket):
     socket.start()
+
     msg = socket.receive()
     assert msg.command == 'Init'
     assert 'cwd' in msg.data
@@ -27,7 +28,6 @@ def test_with_trace(socket):
 
     msg = socket.receive()
     assert msg.command == 'SelectCheck'
-    assert msg.data.breaks == []
     assert msg.data.frame.function == 'fun2'
     file = msg.data.name
 
@@ -69,7 +69,6 @@ def test_with_trace(socket):
 
     msg = socket.receive()
     assert msg.command == 'SelectCheck'
-    assert msg.data.breaks == []
     assert msg.data.frame.function == '<module>'
     file = msg.data.name
 
